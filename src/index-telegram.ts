@@ -752,23 +752,18 @@ async function startMessageLoop(): Promise<void> {
       // Get updates from Telegram (30 second long polling)
       const updates = await telegramBot.getUpdates(30);
 
+      // Store all incoming Telegram messages
       for (const update of updates) {
         if (!update.message) continue;
 
         const message = update.message;
         const timestamp = new Date(message.date * 1000).toISOString();
 
-        // Store chat metadata
         storeChatMetadata(TELEGRAM_CHAT_JID, timestamp);
-
-        // Store the message
         storeTelegramMessage(message, TELEGRAM_CHAT_JID);
-
-        // Enqueue for processing
-        queue.enqueueMessageCheck(TELEGRAM_CHAT_JID);
       }
 
-      // Check for new messages from database
+      // Single path: discover new messages from DB and enqueue once
       const jids = Object.keys(registeredGroups);
       const { messages, newTimestamp } = getNewMessages(
         jids,
@@ -779,11 +774,9 @@ async function startMessageLoop(): Promise<void> {
       if (messages.length > 0) {
         logger.info({ count: messages.length }, 'New messages');
 
-        // Advance the "seen" cursor for all messages immediately
         lastTimestamp = newTimestamp;
         saveState();
 
-        // Deduplicate by group and enqueue
         const groupsWithMessages = new Set<string>();
         for (const msg of messages) {
           groupsWithMessages.add(msg.chat_jid);
@@ -857,7 +850,41 @@ function ensureDockerRunning(): void {
   }
 }
 
+const LOCKFILE_PATH = path.join(DATA_DIR, 'telegram.lock');
+
+function acquireLock(): void {
+  // Prevent duplicate instances by checking for an existing lockfile with a live PID
+  if (fs.existsSync(LOCKFILE_PATH)) {
+    const existingPid = parseInt(fs.readFileSync(LOCKFILE_PATH, 'utf-8').trim(), 10);
+    if (existingPid && !isNaN(existingPid)) {
+      try {
+        process.kill(existingPid, 0); // Check if process is alive (signal 0 = no-op)
+        logger.error({ existingPid }, 'Another instance is already running');
+        process.exit(1);
+      } catch {
+        // Process doesn't exist, stale lockfile — safe to continue
+        logger.info({ stalePid: existingPid }, 'Removing stale lockfile');
+      }
+    }
+  }
+  fs.writeFileSync(LOCKFILE_PATH, String(process.pid));
+}
+
+function releaseLock(): void {
+  try {
+    if (fs.existsSync(LOCKFILE_PATH)) {
+      const pid = parseInt(fs.readFileSync(LOCKFILE_PATH, 'utf-8').trim(), 10);
+      if (pid === process.pid) {
+        fs.unlinkSync(LOCKFILE_PATH);
+      }
+    }
+  } catch {
+    // Best effort cleanup
+  }
+}
+
 async function main(): Promise<void> {
+  acquireLock();
   ensureDockerRunning();
   initDatabase();
   logger.info('Database initialized');
@@ -867,10 +894,12 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
     await queue.shutdown(10000);
+    releaseLock();
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('exit', releaseLock);
 
   await initializeTelegramBot();
 }
