@@ -13,6 +13,7 @@ logs/
 *.keys.json
 .env
 credentials.json
+blogger_config.json
 telegram_config.json
 *.backup
 
