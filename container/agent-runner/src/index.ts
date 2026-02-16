@@ -330,13 +330,24 @@ async function main(): Promise<void> {
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     log(`Agent error: ${errorMessage}`);
-    writeOutput({
-      status: 'error',
-      result: null,
-      newSessionId,
-      error: errorMessage
-    });
-    process.exit(1);
+
+    // If the agent already produced a result before crashing, preserve it
+    if (result) {
+      log(`Preserving previously captured result (outputType=${result.outputType})`);
+      writeOutput({
+        status: 'success',
+        result,
+        newSessionId
+      });
+    } else {
+      writeOutput({
+        status: 'error',
+        result: null,
+        newSessionId,
+        error: errorMessage
+      });
+      process.exit(1);
+    }
   }
 }
 

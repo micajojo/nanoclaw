@@ -161,6 +161,8 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
   schedulerRunning = true;
   logger.info('Scheduler loop started');
 
+  const runningTaskIds = new Set<string>();
+
   const loop = async () => {
     try {
       const dueTasks = getDueTasks();
@@ -169,16 +171,30 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
       }
 
       for (const task of dueTasks) {
+        // Skip tasks already running to prevent duplicate execution
+        if (runningTaskIds.has(task.id)) {
+          logger.debug({ taskId: task.id }, 'Task already running, skipping');
+          continue;
+        }
+
         // Re-check task status in case it was paused/cancelled
         const currentTask = getTaskById(task.id);
         if (!currentTask || currentTask.status !== 'active') {
           continue;
         }
 
+        runningTaskIds.add(currentTask.id);
+
         deps.queue.enqueueTask(
           currentTask.chat_jid,
           currentTask.id,
-          () => runTask(currentTask, deps),
+          async () => {
+            try {
+              await runTask(currentTask, deps);
+            } finally {
+              runningTaskIds.delete(currentTask.id);
+            }
+          },
         );
       }
     } catch (err) {
