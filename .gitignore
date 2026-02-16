@@ -12,6 +12,9 @@ logs/
 # Secrets
 *.keys.json
 .env
+credentials.json
+telegram_config.json
+*.backup
 
 # OS
 .DS_Store

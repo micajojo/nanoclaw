@@ -236,6 +236,23 @@ export function storeMessage(
   );
 }
 
+/**
+ * Store a message from any channel (Telegram, etc.) without WhatsApp types.
+ */
+export function storeRawMessage(
+  id: string,
+  chatJid: string,
+  sender: string,
+  senderName: string,
+  content: string,
+  timestamp: string,
+  isFromMe: boolean,
+): void {
+  db.prepare(
+    `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, chatJid, sender, senderName, content, timestamp, isFromMe ? 1 : 0);
+}
+
 export function getNewMessages(
   jids: string[],
   lastTimestamp: string,

@@ -1,6 +1,6 @@
 import path from 'path';
 
-export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Andy';
+export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Computer';
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
@@ -23,7 +23,7 @@ export const MAIN_GROUP_FOLDER = 'main';
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
 export const CONTAINER_TIMEOUT = parseInt(
-  process.env.CONTAINER_TIMEOUT || '300000',
+  process.env.CONTAINER_TIMEOUT || '600000',
   10,
 );
 export const CONTAINER_MAX_OUTPUT_SIZE = parseInt(
@@ -46,6 +46,5 @@ export const TRIGGER_PATTERN = new RegExp(
 );
 
 // Timezone for scheduled tasks (cron expressions, etc.)
-// Uses system timezone by default
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+// Cron values are in UTC
+export const TIMEZONE = process.env.TZ || 'UTC';

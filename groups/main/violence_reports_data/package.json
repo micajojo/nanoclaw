@@ -1,0 +1,17 @@
+{
+  "name": "violence_reports_data",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "canvas": "^3.2.1",
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0"
+  }
+}
