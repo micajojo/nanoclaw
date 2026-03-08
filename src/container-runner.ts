@@ -5,6 +5,7 @@
  */
 import { ChildProcess, execSync, spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { OneCLI } from '@onecli-sh/sdk';
@@ -324,6 +325,17 @@ function buildMounts(
   if (containerConfig.additionalMounts && containerConfig.additionalMounts.length > 0) {
     const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name);
     mounts.push(...validated);
+  }
+
+  // Gmail credentials directory (for Gmail MCP inside the container)
+  const homeDir = os.homedir();
+  const gmailDir = path.join(homeDir, '.gmail-mcp');
+  if (fs.existsSync(gmailDir)) {
+    mounts.push({
+      hostPath: gmailDir,
+      containerPath: '/home/node/.gmail-mcp',
+      readonly: false,
+    });
   }
 
   // Provider-contributed mounts (e.g. opencode-xdg)
