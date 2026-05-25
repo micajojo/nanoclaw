@@ -1,74 +1,57 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import fs from 'fs';
+import type { ChannelAdapter } from './adapter.js';
 
-// Mock registry (registerChannel runs at import time)
-vi.mock('./registry.js', () => ({ registerChannel: vi.fn() }));
+vi.mock('fs');
+vi.mock('./channel-registry.js', () => ({ registerChannelAdapter: vi.fn() }));
 
-import { GmailChannel, GmailChannelOpts } from './gmail.js';
+import { registerChannelAdapter } from './channel-registry.js';
 
-function makeOpts(overrides?: Partial<GmailChannelOpts>): GmailChannelOpts {
-  return {
-    onMessage: vi.fn(),
-    onChatMetadata: vi.fn(),
-    registeredGroups: () => ({}),
-    ...overrides,
-  };
+async function getFactory(): Promise<(() => ChannelAdapter | Promise<ChannelAdapter> | null) | undefined> {
+  await import('./gmail.js');
+  const call = vi.mocked(registerChannelAdapter).mock.calls.at(-1);
+  return call?.[1]?.factory as (() => ChannelAdapter | Promise<ChannelAdapter> | null) | undefined;
 }
 
-describe('GmailChannel', () => {
-  let channel: GmailChannel;
+describe('gmail channel registration', () => {
+  it('registers under the gmail channel type', async () => {
+    await import('./gmail.js');
+    expect(registerChannelAdapter).toHaveBeenCalledWith(
+      'gmail',
+      expect.objectContaining({ factory: expect.any(Function) }),
+    );
+  });
+});
 
-  beforeEach(() => {
-    channel = new GmailChannel(makeOpts());
+describe('gmail factory', () => {
+  it('returns null when credentials are missing', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    const factory = await getFactory();
+    const adapter = factory?.();
+    expect(adapter).toBeNull();
   });
 
-  describe('ownsJid', () => {
-    it('returns true for gmail: prefixed JIDs', () => {
-      expect(channel.ownsJid('gmail:abc123')).toBe(true);
-      expect(channel.ownsJid('gmail:thread-id-456')).toBe(true);
-    });
+  it('returns an adapter with correct metadata when credentials exist', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    const cred = JSON.stringify({ installed: { client_id: 'id', client_secret: 'sec', redirect_uris: [] } });
+    vi.mocked(fs.readFileSync).mockReturnValue(cred);
 
-    it('returns false for non-gmail JIDs', () => {
-      expect(channel.ownsJid('12345@g.us')).toBe(false);
-      expect(channel.ownsJid('tg:123')).toBe(false);
-      expect(channel.ownsJid('dc:456')).toBe(false);
-      expect(channel.ownsJid('user@s.whatsapp.net')).toBe(false);
-    });
+    const factory = await getFactory();
+    const adapter = (await factory?.()) as ChannelAdapter | null;
+    expect(adapter).not.toBeNull();
+    expect(adapter?.name).toBe('gmail');
+    expect(adapter?.channelType).toBe('gmail');
+    expect(adapter?.supportsThreads).toBe(true);
+    expect(adapter?.isConnected()).toBe(false);
   });
 
-  describe('name', () => {
-    it('is gmail', () => {
-      expect(channel.name).toBe('gmail');
-    });
-  });
+  it('teardown resolves without error when not connected', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    const cred = JSON.stringify({ installed: { client_id: 'id', client_secret: 'sec', redirect_uris: [] } });
+    vi.mocked(fs.readFileSync).mockReturnValue(cred);
 
-  describe('isConnected', () => {
-    it('returns false before connect', () => {
-      expect(channel.isConnected()).toBe(false);
-    });
-  });
-
-  describe('disconnect', () => {
-    it('sets connected to false', async () => {
-      await channel.disconnect();
-      expect(channel.isConnected()).toBe(false);
-    });
-  });
-
-  describe('constructor options', () => {
-    it('accepts custom poll interval', () => {
-      const ch = new GmailChannel(makeOpts(), 30000);
-      expect(ch.name).toBe('gmail');
-    });
-
-    it('defaults to unread query when no filter configured', () => {
-      const ch = new GmailChannel(makeOpts());
-      const query = (ch as unknown as { buildQuery: () => string }).buildQuery();
-      expect(query).toBe('is:unread category:primary');
-    });
-
-    it('defaults with no options provided', () => {
-      const ch = new GmailChannel(makeOpts());
-      expect(ch.name).toBe('gmail');
-    });
+    const factory = await getFactory();
+    const adapter = (await factory?.()) as ChannelAdapter | null;
+    await expect(adapter?.teardown()).resolves.toBeUndefined();
   });
 });
