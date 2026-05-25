@@ -99,7 +99,9 @@ function createGmailAdapter(): ChannelAdapter | null {
       },
     };
 
-    await config.onInbound(senderEmail, gmailThreadId, message);
+    // Use the inbox owner's email as the stable platformId so all inbound
+    // emails route to one messaging group (not one per sender).
+    await config.onInbound(`gmail:${userEmail}`, gmailThreadId, message);
 
     try {
       await gmail.users.messages.modify({

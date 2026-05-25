@@ -135,8 +135,10 @@ export function resolveSession(
 /** Create the session folder and initialize both DBs. */
 export function initSessionFolder(agentGroupId: string, sessionId: string): void {
   const dir = sessionDir(agentGroupId, sessionId);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.mkdirSync(path.join(dir, 'outbox'), { recursive: true });
+  // mode 0o777: containers run as node (UID 1000) but the host process runs
+  // as root. Without world-write, containers can read but not write the DBs.
+  fs.mkdirSync(dir, { recursive: true, mode: 0o777 });
+  fs.mkdirSync(path.join(dir, 'outbox'), { recursive: true, mode: 0o777 });
 
   ensureSchema(inboundDbPath(agentGroupId, sessionId), 'inbound');
   ensureSchema(outboundDbPath(agentGroupId, sessionId), 'outbound');

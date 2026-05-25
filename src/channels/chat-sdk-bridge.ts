@@ -379,7 +379,9 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       }
 
       if (content.operation === 'reaction' && content.messageId && content.emoji) {
-        await adapter.addReaction(tid, content.messageId as string, content.emoji as string);
+        // Strip the :agentGroupId namespace suffix added by messageIdForAgent() — Discord only accepts raw snowflakes
+        const rawMessageId = (content.messageId as string).split(':')[0];
+        await adapter.addReaction(tid, rawMessageId, content.emoji as string);
         return;
       }
 

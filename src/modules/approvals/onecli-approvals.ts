@@ -116,7 +116,9 @@ async function handleRequest(request: ApprovalRequest): Promise<Decision> {
   // Originating agent group is carried on the request via OneCLI's agent
   // identifier (set by container-runner.ts to agentGroup.id). Use it as
   // the scope for approver selection: admin @ group → global admin → owner.
-  const originGroup = request.agent.externalId ? getAgentGroup(request.agent.externalId) : undefined;
+  // Reverse the underscore→hyphen sanitization applied in container-runner.ts
+  const rawId = request.agent.externalId?.replace(/-/g, '_');
+  const originGroup = rawId ? getAgentGroup(rawId) : undefined;
   const agentGroupId = originGroup?.id ?? null;
   const approvers = pickApprover(agentGroupId);
   if (approvers.length === 0) {
