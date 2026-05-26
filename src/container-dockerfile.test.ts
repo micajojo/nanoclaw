@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const dockerfile = readFileSync(
-  join(import.meta.dirname, '..', 'container', 'Dockerfile'),
-  'utf8',
-);
+const dockerfile = readFileSync(join(import.meta.dirname, '..', 'container', 'Dockerfile'), 'utf8');
 
 const lines = dockerfile.split('\n');
 
@@ -54,9 +51,7 @@ describe('Dockerfile', () => {
     it('sets WORKDIR to /workspace/group for node user', () => {
       const userIdxes = lines.reduce<number[]>((acc, l, i) => (/^USER node/.test(l) ? [...acc, i] : acc), []);
       const userIdx = userIdxes[userIdxes.length - 1] ?? -1;
-      const workdirAfterUser = lines
-        .slice(userIdx)
-        .some((l) => /^WORKDIR \/workspace\/group/.test(l));
+      const workdirAfterUser = lines.slice(userIdx).some((l) => /^WORKDIR \/workspace\/group/.test(l));
       expect(workdirAfterUser).toBe(true);
     });
   });
@@ -67,15 +62,11 @@ describe('Dockerfile', () => {
     });
 
     it('points AGENT_BROWSER_EXECUTABLE_PATH to system chromium', () => {
-      expect(
-        hasLine(/ENV AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium/),
-      ).toBe(true);
+      expect(hasLine(/ENV AGENT_BROWSER_EXECUTABLE_PATH=\/usr\/bin\/chromium/)).toBe(true);
     });
 
     it('points PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to system chromium', () => {
-      expect(
-        hasLine(/ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=\/usr\/bin\/chromium/),
-      ).toBe(true);
+      expect(hasLine(/ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=\/usr\/bin\/chromium/)).toBe(true);
     });
 
     it('installs system chromium', () => {
@@ -89,11 +80,7 @@ describe('Dockerfile', () => {
     });
 
     it('does not COPY agent-runner source (source is mounted at runtime)', () => {
-      const copiesSource = lines.some(
-        (l) =>
-          /^COPY\s+agent-runner\/src/.test(l) ||
-          /^ADD\s+agent-runner\/src/.test(l),
-      );
+      const copiesSource = lines.some((l) => /^COPY\s+agent-runner\/src/.test(l) || /^ADD\s+agent-runner\/src/.test(l));
       expect(copiesSource).toBe(false);
     });
   });
