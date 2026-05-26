@@ -12,6 +12,7 @@ import path from 'path';
 import { getCurrentInReplyTo } from '../current-batch.js';
 import { findByName, getAllDestinations } from '../destinations.js';
 import { getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
+import { resolveDestinationThread } from '../db/messages-in.js';
 import { getSessionRouting } from '../db/session-routing.js';
 import { registerTools } from './server.js';
 import type { McpToolDefinition } from './types.js';
@@ -56,10 +57,16 @@ function resolveRouting(
     // Default: reply to whatever thread/channel this session is bound to.
     const session = getSessionRouting();
     if (session.channel_type && session.platform_id) {
+      // In agent-shared sessions session_routing.thread_id is NULL because the
+      // session spans all channels. Fall back to the most recent inbound message
+      // for this channel so send_message routes to the same thread as the
+      // <message to="..."> path in dispatchResultText / sendToDestination.
+      const threadId =
+        session.thread_id ?? resolveDestinationThread(session.channel_type, session.platform_id)?.threadId ?? null;
       return {
         channel_type: session.channel_type,
         platform_id: session.platform_id,
-        thread_id: session.thread_id,
+        thread_id: threadId,
         resolvedName: '(current conversation)',
       };
     }
@@ -77,11 +84,16 @@ function resolveRouting(
   const dest = findByName(to);
   if (!dest) return { error: `Unknown destination "${to}". Known: ${destinationList()}` };
   if (dest.type === 'channel') {
-    // If the destination is the same channel the session is bound to,
-    // preserve the thread_id so replies land in the correct thread.
+    // If the destination is the same channel the session is bound to, preserve
+    // the thread_id so replies land in the correct thread. In agent-shared
+    // sessions session_routing.thread_id is NULL — fall back to the most recent
+    // inbound message so send_message routes to the same thread as the
+    // <message to="..."> path (dispatchResultText / sendToDestination).
     const session = getSessionRouting();
-    const threadId =
-      session.channel_type === dest.channelType && session.platform_id === dest.platformId ? session.thread_id : null;
+    const isSameChannel = session.channel_type === dest.channelType && session.platform_id === dest.platformId;
+    const threadId = isSameChannel
+      ? (session.thread_id ?? resolveDestinationThread(dest.channelType!, dest.platformId!)?.threadId ?? null)
+      : null;
     return {
       channel_type: dest.channelType!,
       platform_id: dest.platformId!,

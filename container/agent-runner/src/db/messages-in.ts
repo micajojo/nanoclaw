@@ -129,6 +129,38 @@ export function markFailed(id: string): void {
     .run(id);
 }
 
+/**
+ * Find the thread_id and message id from the most recent inbound message
+ * matching the given channel+platform. Returns null if no match found.
+ *
+ * Used by both the `<message to="...">` result dispatch path and the
+ * `send_message` MCP tool to ensure both paths route to the same thread
+ * in agent-shared sessions (where session_routing.thread_id is NULL).
+ */
+export function resolveDestinationThread(
+  channelType: string,
+  platformId: string,
+): { threadId: string | null; inReplyTo: string | null } | null {
+  const inbound = openInboundDb();
+  try {
+    const row = inbound
+      .prepare(
+        `SELECT thread_id, id FROM messages_in
+         WHERE channel_type = ? AND platform_id = ?
+         ORDER BY seq DESC LIMIT 1`,
+      )
+      .get(channelType, platformId) as { thread_id: string | null; id: string } | undefined;
+    if (row) return { threadId: row.thread_id, inReplyTo: row.id };
+  } catch (err) {
+    console.error(
+      `[messages-in] resolveDestinationThread error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  } finally {
+    inbound.close();
+  }
+  return null;
+}
+
 /** Get a message by ID (read from inbound.db). */
 export function getMessageIn(id: string): MessageInRow | undefined {
   const inbound = openInboundDb();
