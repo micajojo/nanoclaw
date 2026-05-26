@@ -403,12 +403,19 @@ async function deliverToAgent(
   adapterSupportsThreads: boolean,
   wake: boolean,
 ): Promise<void> {
-  // Apply the adapter thread policy: threaded adapter in a group chat →
-  // per-thread session regardless of wiring. agent-shared preserved (it's
-  // a cross-channel directive the adapter doesn't know about). DMs collapse
-  // sub-threads to one session (is_group=0 short-circuit).
+  // Apply the adapter thread policy: threaded adapter in a group chat with
+  // per-thread wiring → per-thread session. Explicit 'shared' and
+  // 'agent-shared' are both preserved — 'shared' means one session per
+  // messaging group (ignoring Discord sub-threads), 'agent-shared' is a
+  // cross-channel directive. DMs collapse sub-threads to one session via
+  // the is_group=0 short-circuit.
   let effectiveSessionMode = agent.session_mode;
-  if (adapterSupportsThreads && effectiveSessionMode !== 'agent-shared' && mg.is_group !== 0) {
+  if (
+    adapterSupportsThreads &&
+    effectiveSessionMode !== 'agent-shared' &&
+    effectiveSessionMode !== 'shared' &&
+    mg.is_group !== 0
+  ) {
     effectiveSessionMode = 'per-thread';
   }
 
