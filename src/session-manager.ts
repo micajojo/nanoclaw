@@ -142,6 +142,11 @@ export function initSessionFolder(agentGroupId: string, sessionId: string): void
 
   ensureSchema(inboundDbPath(agentGroupId, sessionId), 'inbound');
   ensureSchema(outboundDbPath(agentGroupId, sessionId), 'outbound');
+  // better-sqlite3 creates files with the process umask applied (root + umask
+  // 022 → 644). Containers run as node (UID 1000) and need write access to
+  // outbound.db. Chmod both files to 666 to match the directory's 0o777.
+  fs.chmodSync(inboundDbPath(agentGroupId, sessionId), 0o666);
+  fs.chmodSync(outboundDbPath(agentGroupId, sessionId), 0o666);
 }
 
 /**

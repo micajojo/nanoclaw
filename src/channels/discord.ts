@@ -1,6 +1,12 @@
 /**
- * Discord channel adapter (v2) — uses Chat SDK bridge.
+ * Discord channel adapter(s) (v2) — uses Chat SDK bridge.
  * Self-registers on import.
+ *
+ * Supports multiple named bot instances via DISCORD_BOT_NAMES (comma-separated).
+ * Each name "foo" reads DISCORD_FOO_BOT_TOKEN / DISCORD_FOO_PUBLIC_KEY /
+ * DISCORD_FOO_APPLICATION_ID and registers as channel type "discord-foo".
+ * Messaging groups must have their channel_type set to "discord-foo" to route
+ * through that bot.
  */
 import { createDiscordAdapter } from '@chat-adapter/discord';
 
@@ -18,21 +24,51 @@ function extractReplyContext(raw: Record<string, any>): ReplyContext | null {
   };
 }
 
+function makeBridge(botToken: string, publicKey?: string, applicationId?: string) {
+  return createChatSdkBridge({
+    adapter: createDiscordAdapter({ botToken, publicKey, applicationId }),
+    concurrency: 'concurrent',
+    botToken,
+    extractReplyContext,
+    supportsThreads: true,
+  });
+}
+
+// Default Discord bot — channel type "discord"
 registerChannelAdapter('discord', {
   factory: () => {
     const env = readEnvFile(['DISCORD_BOT_TOKEN', 'DISCORD_PUBLIC_KEY', 'DISCORD_APPLICATION_ID']);
     if (!env.DISCORD_BOT_TOKEN) return null;
-    const discordAdapter = createDiscordAdapter({
-      botToken: env.DISCORD_BOT_TOKEN,
-      publicKey: env.DISCORD_PUBLIC_KEY,
-      applicationId: env.DISCORD_APPLICATION_ID,
-    });
-    return createChatSdkBridge({
-      adapter: discordAdapter,
-      concurrency: 'concurrent',
-      botToken: env.DISCORD_BOT_TOKEN,
-      extractReplyContext,
-      supportsThreads: true,
-    });
+    return makeBridge(env.DISCORD_BOT_TOKEN, env.DISCORD_PUBLIC_KEY, env.DISCORD_APPLICATION_ID);
   },
 });
+
+// Named Discord bots — set DISCORD_BOT_NAMES=research,investment,assistant in .env
+// Each registers as channel type "discord-<name>".
+const { DISCORD_BOT_NAMES } = readEnvFile(['DISCORD_BOT_NAMES']);
+for (const name of (DISCORD_BOT_NAMES ?? '')
+  .split(',')
+  .map((n) => n.trim())
+  .filter(Boolean)) {
+  const upper = name.toUpperCase();
+  const channelType = `discord-${name.toLowerCase()}`;
+  registerChannelAdapter(channelType, {
+    factory: () => {
+      const env = readEnvFile([
+        `DISCORD_${upper}_BOT_TOKEN`,
+        `DISCORD_${upper}_PUBLIC_KEY`,
+        `DISCORD_${upper}_APPLICATION_ID`,
+      ]);
+      if (!env[`DISCORD_${upper}_BOT_TOKEN`]) return null;
+      const bridge = makeBridge(
+        env[`DISCORD_${upper}_BOT_TOKEN`]!,
+        env[`DISCORD_${upper}_PUBLIC_KEY`],
+        env[`DISCORD_${upper}_APPLICATION_ID`],
+      );
+      // Override so routing uses the named type, not generic "discord"
+      bridge.channelType = channelType;
+      bridge.name = channelType;
+      return bridge;
+    },
+  });
+}
