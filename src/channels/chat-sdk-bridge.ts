@@ -421,8 +421,12 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // Display card (send_card MCP tool) — returns immediately, no callback flow.
       // Non-URL actions are dropped: send_card's contract is fire-and-forget, so a
       // callback button would have nowhere to land. URL actions render as link buttons.
-      if (content.type === 'card' && content.card && typeof content.card === 'object') {
-        const cardSpec = content.card as Record<string, unknown>;
+      // Guard: Claude sometimes passes `card` as a JSON string instead of an object.
+      if (content.type === 'card' && content.card) {
+        const cardSpec =
+          typeof content.card === 'string'
+            ? (JSON.parse(content.card) as Record<string, unknown>)
+            : (content.card as Record<string, unknown>);
         const title = (cardSpec.title as string) || '';
         const fallbackText = (content.fallbackText as string) || (cardSpec.description as string) || title || '';
 
