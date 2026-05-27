@@ -76,8 +76,6 @@ function createGmailAdapter(): ChannelAdapter | null {
     const senderName = senderMatch ? senderMatch[1].replace(/"/g, '') : from;
     const senderEmail = senderMatch ? senderMatch[2] : from;
 
-    if (senderEmail === userEmail) return;
-
     const body = extractTextBody(msg.data.payload);
     if (!body) {
       log.debug('Skipping email with no text body', { messageId, subject });
