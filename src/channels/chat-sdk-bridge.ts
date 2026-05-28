@@ -66,6 +66,14 @@ export interface ChatSdkBridgeConfig {
    */
   transformOutboundText?: (text: string) => string;
   /**
+   * Key prefix for the state adapter (dedupe, subscriptions, locks).
+   * When multiple instances of the same SDK adapter share a SQLite database
+   * (e.g. multiple Discord bots in the same guild), each instance must use a
+   * unique prefix so their dedupe entries don't collide and block each other.
+   * Defaults to no prefix (legacy behaviour, single-bot setups).
+   */
+  stateKeyPrefix?: string;
+  /**
    * Maximum text length the underlying adapter accepts in a single message.
    * When set, the bridge splits outbound text longer than this on paragraph
    * → line → hard-char boundaries and posts multiple messages. Without this,
@@ -200,7 +208,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
     async setup(hostConfig: ChannelSetup) {
       setupConfig = hostConfig;
 
-      state = new SqliteStateAdapter();
+      state = new SqliteStateAdapter(config.stateKeyPrefix);
 
       chat = new Chat({
         adapters: { [adapter.name]: adapter },

@@ -24,13 +24,14 @@ function extractReplyContext(raw: Record<string, any>): ReplyContext | null {
   };
 }
 
-function makeBridge(botToken: string, publicKey?: string, applicationId?: string) {
+function makeBridge(botToken: string, publicKey?: string, applicationId?: string, stateKeyPrefix?: string) {
   return createChatSdkBridge({
     adapter: createDiscordAdapter({ botToken, publicKey, applicationId }),
     concurrency: 'concurrent',
     botToken,
     extractReplyContext,
     supportsThreads: true,
+    stateKeyPrefix,
   });
 }
 
@@ -39,7 +40,7 @@ registerChannelAdapter('discord', {
   factory: () => {
     const env = readEnvFile(['DISCORD_BOT_TOKEN', 'DISCORD_PUBLIC_KEY', 'DISCORD_APPLICATION_ID']);
     if (!env.DISCORD_BOT_TOKEN) return null;
-    return makeBridge(env.DISCORD_BOT_TOKEN, env.DISCORD_PUBLIC_KEY, env.DISCORD_APPLICATION_ID);
+    return makeBridge(env.DISCORD_BOT_TOKEN, env.DISCORD_PUBLIC_KEY, env.DISCORD_APPLICATION_ID, 'discord');
   },
 });
 
@@ -64,6 +65,7 @@ for (const name of (DISCORD_BOT_NAMES ?? '')
         env[`DISCORD_${upper}_BOT_TOKEN`]!,
         env[`DISCORD_${upper}_PUBLIC_KEY`],
         env[`DISCORD_${upper}_APPLICATION_ID`],
+        channelType,
       );
       // Override so routing uses the named type, not generic "discord"
       bridge.channelType = channelType;
